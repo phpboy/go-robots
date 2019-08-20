@@ -22,104 +22,209 @@ type ParseResult struct {
 	Items []interface{}
 }
 
+
+type engine struct {
+	Scheduler Schedulers
+	WorkerCount int
+}
+
+type Schedulers interface {
+	ConfigureMaterWorkerChan(chan Request)
+	Submit(Request)
+}
+
+
+//SimpleSchedulers <<<
+type SimpleSchedulers struct {
+	workChan chan Request
+}
+func (s *SimpleSchedulers) ConfigureMaterWorkerChan(c chan Request)  {
+	s.workChan = c
+}
+
+func (s *SimpleSchedulers) Submit(r Request){
+	go func() {
+		s.workChan <- r
+	}()
+}
+//SimpleSchedulers >>>
+
+
 func main(){
-	var result = CityListParser("https://www.zhenai.com/zhenghun")
-	for i,mm:= range result.Items{
-		fmt.Printf("%s\n",mm)
-		fmt.Printf("%s\n",result.Requests[i].Url)
+	e:=engine{
+		Scheduler:&SimpleSchedulers{},
+		WorkerCount:20,
+	}
+	e.Run(
+		Request{
+			Url:"https://www.zhenai.com/zhenghun",
+			ParserFunc:CityListParser,
+		},
+	)
+}
+//多线程的爬虫
+func (e *engine) Run(seeds... Request)  {
+
+	in := make(chan Request)
+	out := make(chan ParseResult)
+
+	e.Scheduler.ConfigureMaterWorkerChan(in)//e.Scheduler.workerChan = in
+
+	for i:=0;i<e.WorkerCount;i++{
+		createWorker(in,out)//开几个go-routine for循环接受in和输出out
+	}
+	for _,seed:= range seeds{
+		e.Scheduler.Submit(seed)//e.Scheduler.workerChan <- seed（Request）
+	}
+
+	for {
+		result := <- out
+		for _,Item := range result.Items{
+			fmt.Printf("Item %v \n",Item)
+		}
+		for _,request := range result.Requests{
+			e.Scheduler.Submit(request)
+		}
+	}
+
+}
+
+
+//单线程的爬虫
+func (e engine) Run1(seeds... Request)  {
+
+	var requests  [] Request
+
+	for _,seed:=range seeds{
+		requests = append(requests,seed)
+	}
+
+	for len(requests)>0{
+		r := requests[0]
+		requests = requests[1:]
+
+		body,err:=fetch(r.Url)
+		if err!=nil{
+			fmt.Println("err:",err)
+			continue
+		}
+		parseResult := r.ParserFunc(body)
+
+		requests = append(requests,parseResult.Requests...)
+
+		for _,item:=range parseResult.Items{
+			fmt.Printf("get %s\n",item)
+		}
+
 	}
 }
 
-func CityListParser(url string) ParseResult {
-	resp,err := http.Get(url)
+func createWorker(in chan Request,out chan ParseResult)  {
+	go func() {
+		for{
+			request := <- in
+			result,err := worker(request)
+			if err!=nil{
+				continue
+			}
+			out <- result
+		}
+	}()
+}
+
+func worker(r Request) (ParseResult ,error) {
+
+	body,err := fetch(r.Url)
+
 	if err != nil{
-		panic(err)
+		fmt.Println("err:",err)
+		return ParseResult{},err
 	}
 
-	//defer resp.Body.Close()
+	return r.ParserFunc(body),nil
 
-	if resp.StatusCode != http.StatusOK{
-		fmt.Println("get url error CODE",resp.StatusCode)
-		panic(err)
-	}
+}
 
-	all,err := ioutil.ReadAll(resp.Body)
 
-	if err!=nil{
-		panic(err)
-	}
 
-	re := regexp.MustCompile(`<a href="(http://www.zhenai.com/zhenghun/[0-9a-z]+)"[^>]*>([^<]+)</a>`)
 
-	matches := re.FindAllSubmatch(all,-1)
+//循环获取每个城市的第一页的用户
+func CityListParser(body []byte) ParseResult {
+
+	regexpResult := regexp.MustCompile(`<a href="(http://www.zhenai.com/zhenghun/[0-9a-z]+)"[^>]*>([^<]+)</a>`)
+
+	matches := regexpResult.FindAllSubmatch(body,-1)
 
 	var result = ParseResult{}
-	//循环获取每个城市的第一页的用户
+	var count = 0
 	for _,m:= range matches{
-
+		count++
 		var url = string(m[1])
-
-		fmt.Printf("city:%s url %s\n\n",m[2],url)
-
 		result.Items = append(result.Items,"City:"+string(m[2]))
 		result.Requests = append(result.Requests,Request{
 			Url:url,
-			ParserFunc: func(bytes []byte) ParseResult {
-				return CityParser(url)
-			},
+			ParserFunc: CityParser,
 		})
+		if count>2{
+			//break
+		}
 	}
 	return result
 }
 
 //城市解析器 -解析第一页的用户
-func CityParser(url string) ParseResult {
-	cityResp,err := http.Get(url)
-	if err != nil{
-		panic(err)
-	}
-	cityBody,err := ioutil.ReadAll(cityResp.Body)
-	if err!=nil{
-		panic(err)
-	}
-
+func CityParser(body []byte) ParseResult {
 	re := regexp.MustCompile(`<a href="(http://album.zhenai.com/u/[0-9a-z]+)"[^>]*>([^<]+)</a>`)
-	matches := re.FindAllSubmatch(cityBody,-1)
-	profile := ParseResult{}
+	matches := re.FindAllSubmatch(body,-1)
+	result := ParseResult{}
+	var count = 0
 	for _,m:= range matches{
+		count++
 		var url = string(m[1])
-		profile.Items = append(profile.Items,"User:"+string(m[2]))
-		profile.Requests = append(profile.Requests,Request{
+		result.Items = append(result.Items,"User:"+string(m[2]))
+		result.Requests = append(result.Requests,Request{
 			Url:url,
-			ParserFunc: func(bytes []byte) ParseResult {
-				return UserParser(url)
-			},
+			ParserFunc: UserParser,
 		})
-	}
-	return profile
-}
-
-//用户解析器 获取用户的个人信息 目前因为对方反爬虫 返回403页面
-func UserParser(url string) ParseResult  {
-
-	userResp,err := http.Get(url)
-	if err != nil{
-		panic(err)
-	}
-	userBody,err := ioutil.ReadAll(userResp.Body)
-	if err!=nil{
-		panic(err)
-	}
-
-	var userinfo = Profile{}
-
-	userinfo.Name = string(userBody)
-
-	var result = ParseResult{
-		Items:[]interface{}{userinfo},
+		if count>10{
+			break
+		}
 	}
 
 	return result
+}
+
+//用户解析器 获取用户的个人信息 目前因为对方反爬虫 返回403页面
+func UserParser(body []byte) ParseResult  {
+	var userInfo = Profile{}
+
+	userInfo.Name = "age:18;name:xx"
+
+	var result = ParseResult{
+		Items:[]interface{}{userInfo},
+	}
+
+	return result
+}
+
+
+//获取远程url
+func fetch(url string) ([]byte,error)  {
+	resp,err := http.Get(url)
+
+	if err != nil{
+		return []byte{},err
+	}
+	if resp.StatusCode != http.StatusOK{
+		fmt.Println("get url error CODE",resp.StatusCode)
+		return []byte{},err
+	}
+
+	body,err := ioutil.ReadAll(resp.Body)
+	if err!=nil{
+		return body,err
+	}
+	return body,nil
 }
 
 
