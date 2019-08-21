@@ -3,13 +3,17 @@ package main
 import (
 	"fmt"
 	"io/ioutil"
+	"log"
+	"net"
 	"net/http"
+	"net/rpc"
+	"net/rpc/jsonrpc"
 	"regexp"
 )
 
 //用户信息
-type Profile struct {
-	Name string
+type GoodInfo struct {
+	price string
 }
 //请求
 type Request struct {
@@ -22,7 +26,7 @@ type ParseResult struct {
 	Items []interface{}
 }
 
-
+//爬虫引擎
 type engine struct {
 	Scheduler Schedulers
 	WorkerCount int
@@ -57,8 +61,8 @@ func main(){
 	}
 	e.Run(
 		Request{
-			Url:"https://www.zhenai.com/zhenghun",
-			ParserFunc:CityListParser,
+			Url:"https://www.dressbycouturier.com",
+			ParserFunc:CategoryListParser,
 		},
 	)
 }
@@ -77,46 +81,18 @@ func (e *engine) Run(seeds... Request)  {
 		e.Scheduler.Submit(seed)//e.Scheduler.workerChan <- seed（Request）
 	}
 
+	count := 0
 	for {
 		result := <- out
 		for _,Item := range result.Items{
-			fmt.Printf("Item %v \n",Item)
+			count++
+			fmt.Printf("#%d-Item %v \n",count,Item)
 		}
 		for _,request := range result.Requests{
 			e.Scheduler.Submit(request)
 		}
 	}
 
-}
-
-
-//单线程的爬虫
-func (e engine) Run1(seeds... Request)  {
-
-	var requests  [] Request
-
-	for _,seed:=range seeds{
-		requests = append(requests,seed)
-	}
-
-	for len(requests)>0{
-		r := requests[0]
-		requests = requests[1:]
-
-		body,err:=fetch(r.Url)
-		if err!=nil{
-			fmt.Println("err:",err)
-			continue
-		}
-		parseResult := r.ParserFunc(body)
-
-		requests = append(requests,parseResult.Requests...)
-
-		for _,item:=range parseResult.Items{
-			fmt.Printf("get %s\n",item)
-		}
-
-	}
 }
 
 func createWorker(in chan Request,out chan ParseResult)  {
@@ -146,62 +122,85 @@ func worker(r Request) (ParseResult ,error) {
 }
 
 
+func CreateRpcPools(hosts [] string) chan *rpc.Client{
+		var clients [] *rpc.Client
+		for _,host:=range hosts{
+
+			conn,err:=net.Dial("tcp",host)
+			if err!=nil{
+				log.Printf("err dial tcp %v",host)
+				continue
+			}
+
+			clients = append(clients,jsonrpc.NewClient(conn))
+		}
 
 
-//循环获取每个城市的第一页的用户
-func CityListParser(body []byte) ParseResult {
+		out:= make(chan *rpc.Client)
 
-	regexpResult := regexp.MustCompile(`<a href="(http://www.zhenai.com/zhenghun/[0-9a-z]+)"[^>]*>([^<]+)</a>`)
+		go func() {
+			for{
+				for _,c:=range clients{
+					out<-c
+				}
+			}
+		}()
+
+		return out
+
+}
+
+//获取首页分类
+func CategoryListParser(body []byte) ParseResult {
+
+	var exp = `<a class="nav_a" style="[^>]+" href="(https://www.dressbycouturier.com/[^>]+)">([^<]+)</a>`
+	regexpResult := regexp.MustCompile(exp)
 
 	matches := regexpResult.FindAllSubmatch(body,-1)
 
 	var result = ParseResult{}
-	var count = 0
 	for _,m:= range matches{
-		count++
 		var url = string(m[1])
-		result.Items = append(result.Items,"City:"+string(m[2]))
+		result.Items = append(result.Items,"category name:"+string(m[2]))
 		result.Requests = append(result.Requests,Request{
 			Url:url,
-			ParserFunc: CityParser,
+			ParserFunc: GoodParser,
 		})
-		if count>2{
-			//break
-		}
 	}
 	return result
 }
 
-//城市解析器 -解析第一页的用户
-func CityParser(body []byte) ParseResult {
-	re := regexp.MustCompile(`<a href="(http://album.zhenai.com/u/[0-9a-z]+)"[^>]*>([^<]+)</a>`)
+//商品列表解析器
+func GoodParser(body []byte) ParseResult {
+	var exp = `<a goods_id="[0-9]+" href="(https://www.dressbycouturier.com/[^>]+)" target="_blank" title="[^>]+">[^<]+</a>`
+	re := regexp.MustCompile(exp)
 	matches := re.FindAllSubmatch(body,-1)
 	result := ParseResult{}
-	var count = 0
 	for _,m:= range matches{
-		count++
 		var url = string(m[1])
-		result.Items = append(result.Items,"User:"+string(m[2]))
+		result.Items = append(result.Items,"good name:"+string(m[1]))
 		result.Requests = append(result.Requests,Request{
 			Url:url,
-			ParserFunc: UserParser,
+			ParserFunc: DetailParser,
 		})
-		if count>10{
-			break
-		}
 	}
 
 	return result
 }
 
-//用户解析器 获取用户的个人信息 目前因为对方反爬虫 返回403页面
-func UserParser(body []byte) ParseResult  {
-	var userInfo = Profile{}
+//商品详情解析器
+func DetailParser(body []byte) ParseResult  {
+	var exp = `<span class="price_local" style="color:#c00000">([^>]+)</span>`
+	re := regexp.MustCompile(exp)
+	matches := re.FindAllSubmatch(body,-1)
 
-	userInfo.Name = "age:18;name:xx"
+	var good = GoodInfo{}
+	for _,m:= range matches{
+		good.price = string(m[1])
+	}
 
 	var result = ParseResult{
-		Items:[]interface{}{userInfo},
+		Items:[]interface{}{good},
 	}
 
 	return result
