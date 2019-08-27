@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<table id="table" class="table table-striped table-hover table-mc-indigo">
+    <tbody>
+    {{range .Items}}
+        <tr>
+            <td><a href="{{.Url}}">{{.Payload.Name}}</a></td>
+            {{with .Payload}}
+                <td>{{.Gender}}</td>
+                <td>{{.Age}}</td>
+                <td>{{.Height}}cm</td>
+                <td>{{.Weight}}kg</td>
+                <td>{{.Income}}</td>
+                <td>{{.Education}}</td>
+                <td>{{.Occupation}}</td>
+                <td>{{.NativePlace}}</td>
+                <td>{{.Constellation}}</td>
+                <td>{{.House}}</td>
+                <td>{{.Car}}</td>
+            {{end}}
+        </tr>
+    {{else}}
+        <div>没有找到相关用户</div>
+    {{end}}
+    </tbody>
+</table>
+</body>
+</html>
