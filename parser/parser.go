@@ -1,6 +1,7 @@
 package parser
 
 import (
+	"go-robots/config"
 	"go-robots/engine"
 	"regexp"
 )
@@ -18,8 +19,8 @@ func ListParser(body []byte) engine.ParseResult {
 		}
 		var url = "http://xiazai.zol.com.cn/"+string(m[1])
 		result.Requests = append(result.Requests,engine.Request{
-			Url:url,
-			ParserFunc: SoftParser,
+			Url:        url,
+			ParserFunc: config.SoftParserConfig,
 		})
 	}
 	return result
@@ -32,16 +33,12 @@ func SoftParser(body []byte) engine.ParseResult {
 	result := engine.ParseResult{}
 	for _,m:= range matches{
 		var url = "http://xiazai.zol.com.cn/"+string(m[1])
-		var name = m[2]
+		//var name = m[2]
 		result.Requests = append(result.Requests,engine.Request{
-			Url:url,
-			ParserFunc: func(bytes []byte) engine.ParseResult {
-				result := DetailParser(bytes,string(name),url)
-				return result
-			},
+			Url:        url,
+			ParserFunc: config.DetailParserConfig,
 		})
 	}
-
 	return result
 }
 
@@ -74,4 +71,5 @@ func DetailParser(body []byte,name,url string) engine.ParseResult  {
 
 	return result
 }
+
 

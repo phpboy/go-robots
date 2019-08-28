@@ -8,6 +8,7 @@ import (
 	"log"
 )
 
+//数据写入elastic
 func Save(item interface{}) error  {
 	client, err := elastic.NewClient(elastic.SetURL("http://47.94.169.212:9201"),elastic.SetSniff(false))
 	if err != nil {

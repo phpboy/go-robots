@@ -1,53 +1,26 @@
 package main
 
 import (
+	"go-robots/config"
 	"go-robots/engine"
-	"go-robots/parser"
-	"log"
-	"net"
-	"net/rpc"
-	"net/rpc/jsonrpc"
 )
 
+//ZOL软件下载为爬取目标 http://xiazai.zol.com.cn/word_index.html
+//先爬取分类列表
+//再爬取分类下软件列表
+//最后爬取软件详情信息
+//数据录入 elasticsearch
 
 func main(){
 	e:=engine.Engine{
-		Scheduler:&engine.SimpleSchedulers{},
-		WorkerCount:20,
+		Scheduler:&engine.SimpleSchedulers{},//调度器
+		WorkerCount:20,//生成20个协程
 	}
 	e.Run(
 		engine.Request{
-			Url:"http://xiazai.zol.com.cn/word_index.html",
-			ParserFunc:parser.ListParser,
+			Url:        "http://xiazai.zol.com.cn/word_index.html",//ZOL软件下载为爬去目标
+			ParserFunc: config.ListParserConfig,
 		},
 	)
-}
-
-
-
-
-func CreateRpcPools(hosts [] string) chan *rpc.Client{
-	var clients [] *rpc.Client
-	for _,host:=range hosts{
-
-		conn,err:=net.Dial("tcp",host)
-		if err!=nil{
-			log.Printf("err dial tcp %v",host)
-			continue
-		}
-
-		clients = append(clients,jsonrpc.NewClient(conn))
-	}
-	out:= make(chan *rpc.Client)
-
-	go func() {
-		for{
-			for _,c:=range clients{
-				out<-c
-			}
-		}
-	}()
-
-	return out
 }
 

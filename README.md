@@ -1,7 +1,14 @@
 # go-robots
+
 GO语言并发分布式爬虫
 
-运行方式 go run main.go
+
+1 生成多台RPC服务器 运行 go run rpc/rpcserver.go
+
+2 然后运行爬虫 go run main.go
+
+3 查看爬取数据 先运行 go run frontend/main.go 
+    浏览器查看  127.0.0.1:8888/search
 
 代码结构
 
@@ -16,9 +23,7 @@ go-robots
     parser   -- 爬虫html源码分析 并获取爬取字段
     
     rpc      -- 本地模拟多机器rpc 分布式处理爬虫任务
-    
-    rpcdemo  -- 测试rpc服务
-    
-    save     -- 保存数据
+        
+    save     -- 保存数据到elasticsearch
     
     main.go  -- 代码入口

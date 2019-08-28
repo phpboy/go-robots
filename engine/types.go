@@ -4,6 +4,11 @@ import (
 	"fmt"
 )
 
+type Parser struct {
+	Url string
+	Method string
+}
+
 //model
 type Model struct {
 	Name string
@@ -16,7 +21,7 @@ type Model struct {
 //请求
 type Request struct {
 	Url string
-	ParserFunc func([]byte) ParseResult
+	ParserFunc string
 }
 //结果
 type ParseResult struct {
@@ -61,6 +66,7 @@ func (e * Engine) Run(seeds... Request)  {
 	for i:=0;i<e.WorkerCount;i++{
 		CreateWorker(in,out)//开几个go-routine for循环接受in和输出out
 	}
+
 	for _,seed:= range seeds{
 		e.Scheduler.Submit(seed)//e.Scheduler.workerChan <- seed（Request）
 	}
@@ -70,7 +76,6 @@ func (e * Engine) Run(seeds... Request)  {
 		result := <- out
 		for _,Item := range result.Items{
 			count++
-			//Save(Item)
 			fmt.Printf("#%d-Item %v \n",count,Item)
 		}
 		for _,request := range result.Requests{
