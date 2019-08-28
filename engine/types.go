@@ -63,8 +63,10 @@ func (e * Engine) Run(seeds... Request)  {
 
 	e.Scheduler.ConfigureMaterWorkerChan(in)//e.Scheduler.workerChan = in
 
+	client:=CreateRpcPool()
+
 	for i:=0;i<e.WorkerCount;i++{
-		CreateWorker(in,out)//开几个go-routine for循环接受in和输出out
+		CreateWorker(in,out,client)//开几个go-routine for循环接受in和输出out
 	}
 
 	for _,seed:= range seeds{

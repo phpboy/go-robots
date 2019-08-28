@@ -1,6 +1,6 @@
 package save
 
-
+//go get gopkg.in/olivere/elastic.v5
 import (
 	"context"
 	"fmt"

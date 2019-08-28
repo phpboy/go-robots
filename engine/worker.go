@@ -8,10 +8,9 @@ import (
 	"net/rpc/jsonrpc"
 )
 
-func CreateWorker(in chan Request,out chan ParseResult)  {
+func CreateWorker(in chan Request,out chan ParseResult,client chan *rpc.Client)  {
 	go func() {
 		for{
-			client:=CreateRpcPool()
 			request := <- in
 			result,err := worker(request,client)
 			if err!=nil{
