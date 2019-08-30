@@ -10,4 +10,6 @@ const (
 	RPCWorker2 = ":9002"
 	RPCWorker3 = ":9003"
 
+	URL = "http://xiazai.zol.com.cn/word_index.html"
+
 )

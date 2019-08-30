@@ -18,7 +18,7 @@ func main(){
 	}
 	e.Run(
 		engine.Request{
-			Url:        "http://xiazai.zol.com.cn/word_index.html",//ZOL软件下载为爬去目标
+			Url:        config.URL,//ZOL软件下载为爬去目标
 			ParserFunc: config.ListParserConfig,
 		},
 	)

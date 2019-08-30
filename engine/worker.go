@@ -42,25 +42,16 @@ func CreateRpcPool() chan *rpc.Client {
 
 	var clients  []*rpc.Client
 
-	conn,err:=net.Dial("tcp",config.RPCWorker1)
-	if err!=nil{
-		fmt.Println("Dial tcp error",err)
-	}
-	client:=jsonrpc.NewClient(conn)
-	clients = append(clients,client)
+	var workers = map[string]string{"1":config.RPCWorker1,"2":config.RPCWorker2,"3":config.RPCWorker3}
 
-	conn,err=net.Dial("tcp",config.RPCWorker2)
-	if err!=nil{
-		fmt.Println("Dial tcp error",err)
+	for _,w:=range workers{
+		conn,err:=net.Dial("tcp",w)
+		if err!=nil{
+			fmt.Println("Dial tcp error",err)
+			continue
+		}
+		clients = append(clients,jsonrpc.NewClient(conn))
 	}
-	clients = append(clients,jsonrpc.NewClient(conn))
-
-	conn,err=net.Dial("tcp",config.RPCWorker3)
-	if err!=nil{
-		fmt.Println("Dial tcp error",err)
-	}
-	clients = append(clients,jsonrpc.NewClient(conn))
-
 
 	out := make(chan *rpc.Client)
 	go func() {
