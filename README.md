@@ -3,7 +3,14 @@
 GO语言并发分布式爬虫
 
 
-1 生成多台RPC服务器 运行 go run rpc/rpcserver.go
+1 生成多台RPC服务器 :
+
+ go run rpc/rpcserver.go --port=:9001 &
+
+ go run rpc/rpcserver.go --port=:9002 &
+
+ go run rpc/rpcserver.go --port=:9003 &
+
 
 2 然后运行爬虫 go run main.go
 
