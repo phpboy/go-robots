@@ -1,9 +1,13 @@
 package fetch
 
+//创建文件夹  golang.org/x/
 
 //git clone https://github.com/golang/net.git
 //go install -x  net
+//move net to 'x' folder
+
 //git clone https://github.com/golang/text.git
+//move text to 'x' folder
 //go install -x  golang.org/x/text
 
 import (
